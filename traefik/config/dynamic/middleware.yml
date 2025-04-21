@@ -1,0 +1,54 @@
+# Dynamic configuration for Traefik middleware
+
+http:
+  middlewares:
+    # Secure Headers Middleware
+    secure-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
+    # Basic Auth for Dashboard
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$ruca84Hq$mbjdMZBAG.KWn7vfN/SNK/"  # admin:password - CHANGE THIS!
+
+    # Rate Limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+
+    # IP Whitelist for Admin
+    admin-whitelist:
+      ipWhiteList:
+        sourceRange:
+          - "127.0.0.1/32"  # localhost
+          - "192.168.1.0/24"  # local network - ADJUST THIS!
+
+    # Compression
+    compress:
+      compress: {}
+
+  # Default TLS Options
+  tls:
+    options:
+      default:
+        minVersion: "VersionTLS12"
+        cipherSuites:
+          - "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+          - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+          - "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+          - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+          - "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"
+          - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"

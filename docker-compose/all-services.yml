@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  # Traefik is defined in its own file (traefik.yml)
+  
+  # FOGIS API Client Service
+  fogis-api-client:
+    image: fogis-api-client:latest
+    container_name: fogis-api-client
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    volumes:
+      - fogis-api-client-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-client.rule=Host(`${API_CLIENT_HOST:-api.localhost}`)"
+      - "traefik.http.routers.api-client.entrypoints=websecure"
+      - "traefik.http.routers.api-client.tls=true"
+      - "traefik.http.routers.api-client.middlewares=secure-headers"
+      - "traefik.http.services.api-client.loadbalancer.server.port=8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/hello"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  
+  # Match List Change Detector
+  match-list-change-detector:
+    image: match-list-change-detector:latest
+    container_name: match-list-change-detector
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    volumes:
+      - match-detector-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+      - FOGIS_API_URL=http://fogis-api-client:8000
+    depends_on:
+      fogis-api-client:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.match-detector.rule=Host(`${MATCH_DETECTOR_HOST:-detector.localhost}`)"
+      - "traefik.http.routers.match-detector.entrypoints=websecure"
+      - "traefik.http.routers.match-detector.tls=true"
+      - "traefik.http.routers.match-detector.middlewares=secure-headers"
+      - "traefik.http.services.match-detector.loadbalancer.server.port=8000"
+  
+  # Match List Processor
+  match-list-processor:
+    image: match-list-processor:latest
+    container_name: match-list-processor
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    volumes:
+      - match-processor-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+      - FOGIS_API_URL=http://fogis-api-client:8000
+      - AVATAR_SERVICE_URL=http://team-logo-combiner:8000
+      - GOOGLE_DRIVE_URL=http://google-drive-service:8000
+    depends_on:
+      fogis-api-client:
+        condition: service_healthy
+      team-logo-combiner:
+        condition: service_started
+      google-drive-service:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.match-processor.rule=Host(`${MATCH_PROCESSOR_HOST:-processor.localhost}`)"
+      - "traefik.http.routers.match-processor.entrypoints=websecure"
+      - "traefik.http.routers.match-processor.tls=true"
+      - "traefik.http.routers.match-processor.middlewares=secure-headers"
+      - "traefik.http.services.match-processor.loadbalancer.server.port=8000"
+  
+  # Team Logo Combiner (WhatsApp Avatar Service)
+  team-logo-combiner:
+    image: team-logo-combiner:latest
+    container_name: team-logo-combiner
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    volumes:
+      - logo-combiner-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.logo-combiner.rule=Host(`${LOGO_COMBINER_HOST:-logos.localhost}`)"
+      - "traefik.http.routers.logo-combiner.entrypoints=websecure"
+      - "traefik.http.routers.logo-combiner.tls=true"
+      - "traefik.http.routers.logo-combiner.middlewares=secure-headers"
+      - "traefik.http.services.logo-combiner.loadbalancer.server.port=8000"
+  
+  # FOGIS Calendar Phonebook Sync
+  fogis-calendar-phonebook-sync:
+    image: fogis-calendar-phonebook-sync:latest
+    container_name: fogis-calendar-phonebook-sync
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    volumes:
+      - calendar-sync-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+      - FOGIS_API_URL=http://fogis-api-client:8000
+    depends_on:
+      fogis-api-client:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calendar-sync.rule=Host(`${CALENDAR_SYNC_HOST:-calendar.localhost}`)"
+      - "traefik.http.routers.calendar-sync.entrypoints=websecure"
+      - "traefik.http.routers.calendar-sync.tls=true"
+      - "traefik.http.routers.calendar-sync.middlewares=secure-headers"
+      - "traefik.http.services.calendar-sync.loadbalancer.server.port=8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  
+  # Google Drive Service
+  google-drive-service:
+    image: google-drive-service:latest
+    container_name: google-drive-service
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    volumes:
+      - google-drive-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.drive-service.rule=Host(`${DRIVE_SERVICE_HOST:-drive.localhost}`)"
+      - "traefik.http.routers.drive-service.entrypoints=websecure"
+      - "traefik.http.routers.drive-service.tls=true"
+      - "traefik.http.routers.drive-service.middlewares=secure-headers"
+      - "traefik.http.services.drive-service.loadbalancer.server.port=8000"
+
+networks:
+  traefik-public:
+    external: true
+
+volumes:
+  fogis-api-client-data:
+  match-detector-data:
+  match-processor-data:
+  logo-combiner-data:
+  calendar-sync-data:
+  google-drive-data:
